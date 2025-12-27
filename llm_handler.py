@@ -1,21 +1,25 @@
 import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
-# It's recommended to set the API key as an environment variable for security
+# Load environment variables
 load_dotenv()
-GOOGLE_API_KEY = "" """Give your Gemini API key"""
+GOOGLE_API_KEY = "" #enter your gemini api key
 
-# Warn if key is missing; do not hardcode in code
+# Warn if key is missing
 if not GOOGLE_API_KEY:
-    print("Warning: GOOGLE_API_KEY / GEMINI_API_KEY not found in environment. LLM features may fail.")
-else:
-    genai.configure(api_key=GOOGLE_API_KEY)
+    print("Warning: GOOGLE_API_KEY not found in environment. LLM features may fail.")
 
 class LLMHandler:
     """Handles interaction with the Gemini LLM for generating and fixing Manim scripts."""
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        # Initialize the new Gen AI Client
+        # The new SDK handles the API key explicitly here
+        self.client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        # Switched to 'gemini-flash-latest' to avoid the 20/day quota limit of gemini-2.5-flash
+        # This alias points to the stable Flash model (e.g., 1.5 Flash) which has much higher limits.
+        self.model_name = 'gemini-flash-latest'
 
     def _get_system_prompt(self, class_name):
         """Generates a detailed system prompt to guide the LLM."""
@@ -99,8 +103,10 @@ class {class_name}(VoiceoverScene):
         system_prompt = self._get_system_prompt(class_name)
         user_prompt = f"Generate a Manim script that explains the following topic: '{topic}'"
 
-        response = self.model.generate_content(
-            f"{system_prompt}\n\n**User Request:**\n{user_prompt}"
+        # Updated for new SDK: client.models.generate_content
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=f"{system_prompt}\n\n**User Request:**\n{user_prompt}"
         )
 
         # Clean up the response to extract only the Python code block
@@ -132,7 +138,11 @@ Analyze the error message and the code, then provide a corrected, complete, and 
 Refer to the detailed system prompt you were originally given to ensure all pedagogical, technical, and visual standards are met.
 Only output the raw Python code, with no explanations or markdown.
 """
-        response = self.model.generate_content(prompt)
+        # Updated for new SDK: client.models.generate_content
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt
+        )
         
         # Clean up the response
         fixed_code = response.text.strip()
@@ -143,4 +153,3 @@ Only output the raw Python code, with no explanations or markdown.
 
         print("--- AI has provided a potential fix ---")
         return fixed_code.strip()
-
